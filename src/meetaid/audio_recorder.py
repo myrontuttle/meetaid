@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 import wave
 from queue import Queue
 
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 data_format = pyaudio.paInt24  # 24 bits per sample
 spkr_filename = "output/spkr_output.wav"
 mic_filename = "output/mic_output.wav"
-combined_filename = "output/combined.wav"
 
 
 class ARException(Exception):
@@ -190,6 +190,8 @@ if __name__ == "__main__":
                     )
                 ):
                     spkr_filename = com[1]
+                if not os.path.exists('output'):
+                    os.makedirs('output')
 
                 spkr_file = wave.open(spkr_filename, "wb")
                 spkr_file.setnchannels(target_device["maxInputChannels"])
@@ -213,7 +215,7 @@ if __name__ == "__main__":
                 sound2 = AudioSegment.from_file(spkr_filename)
 
                 combined = sound1.overlay(sound2)
-
+                combined_filename = "output/" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".wav"
                 combined.export(combined_filename, format="wav")
 
                 print(
