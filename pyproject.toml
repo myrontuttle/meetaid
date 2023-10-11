@@ -6,7 +6,7 @@ build-backend = "pdm.pep517.api"
 
 [project]
 name = "meetaid"
-version = "0.2.3"
+version = "0.2.4"
 description = "Meeting Aid"
 authors = [
     { name = "Myron Tuttle", email = "myrongt@gmail.com" },

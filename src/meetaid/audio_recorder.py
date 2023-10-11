@@ -150,14 +150,20 @@ class AudioRecorder:
             mic_file.writeframes(mic_queue.get())
         mic_file.close()
 
-        sound1 = AudioSegment.from_file(mic_filename)
-        sound2 = AudioSegment.from_file(spkr_filename)
-
-        combined = sound1.overlay(sound2)
         combined_filename = (
             "output/" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".wav"
         )
-        combined.export(combined_filename, format="wav")
+        if spkr_queue.empty():
+            os.rename(mic_filename, combined_filename)
+        elif mic_queue.empty():
+            os.rename(spkr_filename, combined_filename)
+        else:
+            sound1 = AudioSegment.from_file(mic_filename)
+            sound2 = AudioSegment.from_file(spkr_filename)
+
+            combined = sound1.overlay(sound2)
+
+            combined.export(combined_filename, format="wav")
 
         Label(
             window, text=f"The audio is written to a [{combined_filename}]."
@@ -166,12 +172,10 @@ class AudioRecorder:
     def stop_stream(self):
         self.spkr_stream.stop_stream()
         self.mic_stream.stop_stream()
-        Label(window, text="Stream stopped").pack()
 
     def start_stream(self):
         self.spkr_stream.start_stream()
         self.mic_stream.start_stream()
-        Label(window, text="Stream started").pack()
 
     def close_stream(self):
         if self.spkr_stream is not None:
@@ -205,20 +209,6 @@ if __name__ == "__main__":
         text="Start",
         bg="green",
         command=ar.start_recording,
-        font=("bold", 20),
-    ).pack()
-    Button(
-        window,
-        text="Pause",
-        bg="green",
-        command=ar.stop_stream,
-        font=("bold", 20),
-    ).pack()
-    Button(
-        window,
-        text="Continue",
-        bg="green",
-        command=ar.start_stream,
         font=("bold", 20),
     ).pack()
     Button(
