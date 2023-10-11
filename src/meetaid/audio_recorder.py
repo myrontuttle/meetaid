@@ -1,8 +1,9 @@
 import logging
 import os
-from datetime import datetime
 import wave
+from datetime import datetime
 from queue import Queue
+from tkinter import Button, Label, Tk
 
 import pyaudiowpatch as pyaudio
 from pydub import AudioSegment
@@ -18,6 +19,13 @@ logger = logging.getLogger(__name__)
 data_format = pyaudio.paInt24  # 24 bits per sample
 spkr_filename = "output/spkr_output.wav"
 mic_filename = "output/mic_output.wav"
+
+window = Tk()
+window.geometry("450x400")
+window.title("Meeting Aid")
+Label(
+    window, text="Click on Start To Start Recording", font=("bold", 20)
+).pack()
 
 
 class ARException(Exception):
@@ -79,8 +87,16 @@ class AudioRecorder:
         self.mic_queue.put(in_data)
         return (in_data, pyaudio.paContinue)
 
-    def start_recording(self, target_device: dict):
+    def start_recording(self):
         self.close_stream()
+
+        target_device = None
+        try:
+            target_device = ar.get_default_wasapi_device(p)
+        except ARException as E:
+            print(
+                f"Something went wrong... {type(E)} = " f"{str(E)[:30]}...\n"
+            )
 
         self.spkr_stream = self.p.open(
             format=data_format,
@@ -99,14 +115,63 @@ class AudioRecorder:
             input=True,
             stream_callback=self.mic_callback,
         )
+        Label(window, text="Recording has started").pack()
+
+    def stop_recording(self):
+        self.close_stream()
+        Label(window, text="Recording has stopped").pack()
+
+        if not os.path.exists("output"):
+            os.makedirs("output")
+
+        target_device = None
+        try:
+            target_device = ar.get_default_wasapi_device(p)
+        except ARException as E:
+            print(
+                f"Something went wrong... {type(E)} = " f"{str(E)[:30]}...\n"
+            )
+
+        spkr_file = wave.open(spkr_filename, "wb")
+        spkr_file.setnchannels(target_device["maxInputChannels"])
+        spkr_file.setsampwidth(pyaudio.get_sample_size(data_format))
+        spkr_file.setframerate(int(target_device["defaultSampleRate"]))
+
+        while not spkr_queue.empty():
+            spkr_file.writeframes(spkr_queue.get())
+        spkr_file.close()
+
+        mic_file = wave.open(mic_filename, "wb")
+        mic_file.setnchannels(target_device["maxInputChannels"])
+        mic_file.setsampwidth(pyaudio.get_sample_size(data_format))
+        mic_file.setframerate(int(target_device["defaultSampleRate"]))
+
+        while not mic_queue.empty():
+            mic_file.writeframes(mic_queue.get())
+        mic_file.close()
+
+        sound1 = AudioSegment.from_file(mic_filename)
+        sound2 = AudioSegment.from_file(spkr_filename)
+
+        combined = sound1.overlay(sound2)
+        combined_filename = (
+            "output/" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".wav"
+        )
+        combined.export(combined_filename, format="wav")
+
+        Label(
+            window, text=f"The audio is written to a [{combined_filename}]."
+        ).pack()
 
     def stop_stream(self):
         self.spkr_stream.stop_stream()
         self.mic_stream.stop_stream()
+        Label(window, text="Stream stopped").pack()
 
     def start_stream(self):
         self.spkr_stream.start_stream()
         self.mic_stream.start_stream()
+        Label(window, text="Stream started").pack()
 
     def close_stream(self):
         if self.spkr_stream is not None:
@@ -135,100 +200,36 @@ if __name__ == "__main__":
     mic_queue = Queue()
     ar = AudioRecorder(p, spkr_queue, mic_queue)
 
-    help_msg = (
-        30 * "-" + "\n\n\nStatus:\nRunning=%s | Device=%s | "
-        "output=%s\n\nCommands:\nlist\nrecord {"
-        "device_index\\default}\npause\ncontinue\nstop {"
-        "*.wav\\default}\n"
-    )
+    Button(
+        window,
+        text="Start",
+        bg="green",
+        command=ar.start_recording,
+        font=("bold", 20),
+    ).pack()
+    Button(
+        window,
+        text="Pause",
+        bg="green",
+        command=ar.stop_stream,
+        font=("bold", 20),
+    ).pack()
+    Button(
+        window,
+        text="Continue",
+        bg="green",
+        command=ar.start_stream,
+        font=("bold", 20),
+    ).pack()
+    Button(
+        window,
+        text="Stop",
+        bg="green",
+        command=ar.stop_recording,
+        font=("bold", 20),
+    ).pack()
 
-    target_device = None
+    window.mainloop()
 
-    try:
-        while True:
-            print(
-                help_msg
-                % (
-                    ar.stream_status,
-                    target_device["index"]
-                    if target_device is not None
-                    else "None",
-                    spkr_filename,
-                )
-            )
-            com = input("Enter command: ").split()
-
-            if com[0] == "list":
-                p.print_detailed_system_info()
-
-            elif com[0] == "record":
-                if len(com) > 1 and com[1].isdigit():
-                    target_device = p.get_device_info_by_index(int(com[1]))
-                else:
-                    try:
-                        target_device = ar.get_default_wasapi_device(p)
-                    except ARException as E:
-                        print(
-                            f"Something went wrong... {type(E)} = "
-                            f"{str(E)[:30]}...\n"
-                        )
-                        continue
-                ar.start_recording(target_device)
-
-            elif com[0] == "pause":
-                ar.stop_stream()
-            elif com[0] == "continue":
-                ar.start_stream()
-            elif com[0] == "stop":
-                ar.close_stream()
-
-                if (
-                    len(com) > 1
-                    and com[1].endswith(".wav")
-                    and os.path.exists(
-                        os.path.dirname(os.path.realpath(com[1]))
-                    )
-                ):
-                    spkr_filename = com[1]
-                if not os.path.exists('output'):
-                    os.makedirs('output')
-
-                spkr_file = wave.open(spkr_filename, "wb")
-                spkr_file.setnchannels(target_device["maxInputChannels"])
-                spkr_file.setsampwidth(pyaudio.get_sample_size(data_format))
-                spkr_file.setframerate(int(target_device["defaultSampleRate"]))
-
-                while not spkr_queue.empty():
-                    spkr_file.writeframes(spkr_queue.get())
-                spkr_file.close()
-
-                mic_file = wave.open(mic_filename, "wb")
-                mic_file.setnchannels(target_device["maxInputChannels"])
-                mic_file.setsampwidth(pyaudio.get_sample_size(data_format))
-                mic_file.setframerate(int(target_device["defaultSampleRate"]))
-
-                while not mic_queue.empty():
-                    mic_file.writeframes(mic_queue.get())
-                mic_file.close()
-
-                sound1 = AudioSegment.from_file(mic_filename)
-                sound2 = AudioSegment.from_file(spkr_filename)
-
-                combined = sound1.overlay(sound2)
-                combined_filename = "output/" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".wav"
-                combined.export(combined_filename, format="wav")
-
-                print(
-                    f"The audio is written to a [{combined_filename}]. "
-                    f"Exit..."
-                )
-                break
-
-            else:
-                print(f"[{com[0]}] is unknown command")
-
-    except KeyboardInterrupt:
-        print("\n\nExit without saving...")
-    finally:
-        ar.close_stream()
-        p.terminate()
+    ar.close_stream()
+    p.terminate()
