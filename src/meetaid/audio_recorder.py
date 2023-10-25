@@ -132,38 +132,40 @@ class AudioRecorder:
                 f"Something went wrong... {type(E)} = " f"{str(E)[:30]}...\n"
             )
 
-        spkr_file = wave.open(spkr_filename, "wb")
-        spkr_file.setnchannels(target_device["maxInputChannels"])
-        spkr_file.setsampwidth(pyaudio.get_sample_size(data_format))
-        spkr_file.setframerate(int(target_device["defaultSampleRate"]))
+        if not spkr_queue.empty():
+            spkr_file = wave.open(spkr_filename, "wb")
+            spkr_file.setnchannels(target_device["maxInputChannels"])
+            spkr_file.setsampwidth(pyaudio.get_sample_size(data_format))
+            spkr_file.setframerate(int(target_device["defaultSampleRate"]))
 
-        while not spkr_queue.empty():
-            spkr_file.writeframes(spkr_queue.get())
-        spkr_file.close()
+            while not spkr_queue.empty():
+                spkr_file.writeframes(spkr_queue.get())
+            spkr_file.close()
 
-        mic_file = wave.open(mic_filename, "wb")
-        mic_file.setnchannels(target_device["maxInputChannels"])
-        mic_file.setsampwidth(pyaudio.get_sample_size(data_format))
-        mic_file.setframerate(int(target_device["defaultSampleRate"]))
+        if not mic_queue.empty():
+            mic_file = wave.open(mic_filename, "wb")
+            mic_file.setnchannels(target_device["maxInputChannels"])
+            mic_file.setsampwidth(pyaudio.get_sample_size(data_format))
+            mic_file.setframerate(int(target_device["defaultSampleRate"]))
 
-        while not mic_queue.empty():
-            mic_file.writeframes(mic_queue.get())
-        mic_file.close()
+            while not mic_queue.empty():
+                mic_file.writeframes(mic_queue.get())
+            mic_file.close()
 
         combined_filename = (
-            "output/" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".wav"
+            "output/audio_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".wav"
         )
-        if spkr_queue.empty():
+        if not os.path.exists(spkr_filename):
             os.rename(mic_filename, combined_filename)
-        elif mic_queue.empty():
+        elif not os.path.exists(mic_filename):
             os.rename(spkr_filename, combined_filename)
         else:
             sound1 = AudioSegment.from_file(mic_filename)
             sound2 = AudioSegment.from_file(spkr_filename)
-
             combined = sound1.overlay(sound2)
-
             combined.export(combined_filename, format="wav")
+            os.remove(mic_filename)
+            os.remove(spkr_filename)
 
         Label(
             window, text=f"The audio is written to a [{combined_filename}]."
