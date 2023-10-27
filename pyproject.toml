@@ -27,6 +27,10 @@ classifiers = [
 dependencies = [
     "PyAudioWPatch>=0.2.12.6",
     "pydub>=0.25.1",
+    "torch @ file:///${PROJECT_ROOT}/../torch-2.1.0%2Bcu118-cp311-cp311-win_amd64.whl",
+    "torchaudio @ file:///${PROJECT_ROOT}/../torchaudio-2.1.0%2Bcu118-cp311-cp311-win_amd64.whl",
+    "openai-whisper>=20230918",
+    "whisperx @ git+https://github.com/m-bain/whisperx.git",
 ]
 
 [project.license]
@@ -67,6 +71,7 @@ test = [
     "coverage[toml]>=7.2.3",
     "pytest-randomly>=3.12",
     "pytest-xdist>=3.2.1",
+    "ipykernel>=6.26.0",
 ]
 typing = [
     "mypy>=1.2.0",
