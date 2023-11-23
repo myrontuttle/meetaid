@@ -1,9 +1,7 @@
 import logging
 import os
 import wave
-from datetime import datetime
 from queue import Queue
-from tkinter import Button, Label, Tk
 
 import pyaudiowpatch as pyaudio
 from pydub import AudioSegment
@@ -17,15 +15,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 data_format = pyaudio.paInt24  # 24 bits per sample
-spkr_filename = "output/spkr_output.wav"
-mic_filename = "output/mic_output.wav"
-
-window = Tk()
-window.geometry("450x400")
-window.title("Meeting Aid")
-Label(
-    window, text="Click on Start To Start Recording", font=("bold", 20)
-).pack()
 
 
 class ARException(Exception):
@@ -43,12 +32,10 @@ class InvalidDevice(ARException):
 class AudioRecorder:
     CHUNK_SIZE = 512
 
-    def __init__(
-        self, p_audio: pyaudio.PyAudio, spkr_queue: Queue, mic_queue: Queue
-    ):
-        self.p = p_audio
-        self.spkr_queue = spkr_queue
-        self.mic_queue = mic_queue
+    def __init__(self):
+        self.p = pyaudio.PyAudio()
+        self.spkr_queue = Queue()
+        self.mic_queue = Queue()
         self.spkr_stream = None
         self.mic_stream = None
 
@@ -87,12 +74,16 @@ class AudioRecorder:
         self.mic_queue.put(in_data)
         return (in_data, pyaudio.paContinue)
 
-    def start_recording(self):
+    def start_recording(self, unique_id):
         self.close_stream()
 
+        self.unique_id = unique_id
+        self.spkr_filename = f"output/spkr_{unique_id}.wav"
+        self.mic_filename = f"output/mic_{unique_id}.wav"
+        self.combined_filename = f"output/audio_{unique_id}.wav"
         target_device = None
         try:
-            target_device = ar.get_default_wasapi_device(p)
+            target_device = ar.get_default_wasapi_device(self.p)
         except ARException as E:
             print(
                 f"Something went wrong... {type(E)} = " f"{str(E)[:30]}...\n"
@@ -115,61 +106,50 @@ class AudioRecorder:
             input=True,
             stream_callback=self.mic_callback,
         )
-        Label(window, text="Recording has started").pack()
 
-    def stop_recording(self):
+    def stop_recording(self) -> str:
         self.close_stream()
-        Label(window, text="Recording has stopped").pack()
-
-        if not os.path.exists("output"):
-            os.makedirs("output")
 
         target_device = None
         try:
-            target_device = ar.get_default_wasapi_device(p)
+            target_device = ar.get_default_wasapi_device(self.p)
         except ARException as E:
             print(
                 f"Something went wrong... {type(E)} = " f"{str(E)[:30]}...\n"
             )
 
-        if not spkr_queue.empty():
-            spkr_file = wave.open(spkr_filename, "wb")
+        if not self.spkr_queue.empty():
+            spkr_file = wave.open(self.spkr_filename, "wb")
             spkr_file.setnchannels(target_device["maxInputChannels"])
             spkr_file.setsampwidth(pyaudio.get_sample_size(data_format))
             spkr_file.setframerate(int(target_device["defaultSampleRate"]))
 
-            while not spkr_queue.empty():
-                spkr_file.writeframes(spkr_queue.get())
+            while not self.spkr_queue.empty():
+                spkr_file.writeframes(self.spkr_queue.get())
             spkr_file.close()
 
-        if not mic_queue.empty():
-            mic_file = wave.open(mic_filename, "wb")
+        if not self.mic_queue.empty():
+            mic_file = wave.open(self.mic_filename, "wb")
             mic_file.setnchannels(target_device["maxInputChannels"])
             mic_file.setsampwidth(pyaudio.get_sample_size(data_format))
             mic_file.setframerate(int(target_device["defaultSampleRate"]))
 
-            while not mic_queue.empty():
-                mic_file.writeframes(mic_queue.get())
+            while not self.mic_queue.empty():
+                mic_file.writeframes(self.mic_queue.get())
             mic_file.close()
 
-        combined_filename = (
-            "output/audio_" + datetime.now().strftime("%Y%m%d-%H%M%S") + ".wav"
-        )
-        if not os.path.exists(spkr_filename):
-            os.rename(mic_filename, combined_filename)
-        elif not os.path.exists(mic_filename):
-            os.rename(spkr_filename, combined_filename)
+        if not os.path.exists(self.spkr_filename):
+            os.rename(self.mic_filename, self.combined_filename)
+        elif not os.path.exists(self.mic_filename):
+            os.rename(self.spkr_filename, self.combined_filename)
         else:
-            sound1 = AudioSegment.from_file(mic_filename)
-            sound2 = AudioSegment.from_file(spkr_filename)
+            sound1 = AudioSegment.from_file(self.mic_filename)
+            sound2 = AudioSegment.from_file(self.spkr_filename)
             combined = sound1.overlay(sound2)
-            combined.export(combined_filename, format="wav")
-            os.remove(mic_filename)
-            os.remove(spkr_filename)
-
-        Label(
-            window, text=f"The audio is written to a [{combined_filename}]."
-        ).pack()
+            combined.export(self.combined_filename, format="wav")
+            os.remove(self.mic_filename)
+            os.remove(self.spkr_filename)
+        return self.combined_filename
 
     def stop_stream(self):
         self.spkr_stream.stop_stream()
@@ -189,6 +169,9 @@ class AudioRecorder:
             self.mic_stream.close()
             self.mic_stream = None
 
+    def terminate(self):
+        self.p.terminate()
+
     @property
     def stream_status(self):
         return (
@@ -201,27 +184,6 @@ class AudioRecorder:
 
 
 if __name__ == "__main__":
-    p = pyaudio.PyAudio()
-    spkr_queue = Queue()
-    mic_queue = Queue()
-    ar = AudioRecorder(p, spkr_queue, mic_queue)
+    ar = AudioRecorder()
 
-    Button(
-        window,
-        text="Start",
-        bg="green",
-        command=ar.start_recording,
-        font=("bold", 20),
-    ).pack()
-    Button(
-        window,
-        text="Stop",
-        bg="green",
-        command=ar.stop_recording,
-        font=("bold", 20),
-    ).pack()
-
-    window.mainloop()
-
-    ar.close_stream()
-    p.terminate()
+    ar.terminate()

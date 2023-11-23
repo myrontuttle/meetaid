@@ -31,6 +31,9 @@ dependencies = [
     "torchaudio @ file:///${PROJECT_ROOT}/../torchaudio-2.1.0%2Bcu118-cp311-cp311-win_amd64.whl",
     "openai-whisper>=20230918",
     "whisperx @ git+https://github.com/m-bain/whisperx.git",
+    "opencv-python>=4.8.1.78",
+    "pyautogui>=0.9.54",
+    "numpy>=1.25.2",
 ]
 
 [project.license]
