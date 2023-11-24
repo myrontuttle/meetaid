@@ -14,6 +14,12 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 SCREEN_SIZE = tuple(pyautogui.size())
+V_LEFT = 135
+V_TOP = 235
+V_WIDTH = 1100
+V_HEIGHT = 620
+VIDEO_REGION = (V_LEFT, V_TOP, V_WIDTH, V_HEIGHT)
+VIDEO_SIZE = (V_WIDTH, V_HEIGHT)
 # define the codec
 CODEC = cv2.VideoWriter_fourcc(*"XVID")
 # frames per second
@@ -31,7 +37,7 @@ class VideoRecorder:
         logger.debug(video_filename.format(self.unique_id))
         # create the video write object
         self.vw = cv2.VideoWriter(
-            video_filename.format(self.unique_id), CODEC, FPS, (SCREEN_SIZE)
+            video_filename.format(self.unique_id), CODEC, FPS, (VIDEO_SIZE)
         )
         if self.started:
             logger.warn("Threaded video capturing has already been started.")
@@ -43,7 +49,7 @@ class VideoRecorder:
 
     def _update_video(self):
         while self.started:
-            img = pyautogui.screenshot()
+            img = pyautogui.screenshot(region=VIDEO_REGION)
             frame = np.array(img)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             self.vw.write(frame)
