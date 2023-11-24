@@ -52,7 +52,6 @@ class VideoRecorder:
             img = pyautogui.screenshot(region=VIDEO_REGION)
             frame = np.array(img)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            self.vw.write(frame)
             for i in range(0, 5):
                 self.vw.write(frame)
 
