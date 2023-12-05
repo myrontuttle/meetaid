@@ -34,6 +34,9 @@ dependencies = [
     "opencv-python>=4.8.1.78",
     "pyautogui>=0.9.54",
     "numpy>=1.25.2",
+    "scenedetect>=0.6.2",
+    "torchvision @ file:///${PROJECT_ROOT}/../torchvision-0.16.0%2Bcpu-cp311-cp311-win_amd64.whl",
+    "easyocr>=1.7.1",
 ]
 
 [project.license]

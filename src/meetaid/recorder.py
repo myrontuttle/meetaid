@@ -14,6 +14,8 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
+DT_FORMAT = "%Y%m%d-%H%M%S"
+
 window = Tk()
 window.geometry("450x400")
 window.title("Meeting Aid")
@@ -30,7 +32,7 @@ class Recorder:
         self.vr = VideoRecorder()
 
     def start_audio_recording(self):
-        dt = datetime.now().strftime("%Y%m%d-%H%M%S")
+        dt = datetime.now().strftime(DT_FORMAT)
         self.ar.start_recording(dt)
         Label(window, text="Audio recording has started").pack()
 
@@ -42,7 +44,7 @@ class Recorder:
         ).pack()
 
     def start_video_recording(self):
-        dt = datetime.now().strftime("%Y%m%d-%H%M%S")
+        dt = datetime.now().strftime(DT_FORMAT)
         self.vr.start_recording(dt)
         Label(window, text="Video recording has started").pack()
 
